@@ -925,7 +925,8 @@ class Ftq(parentName:String = "Unknown")(implicit p: Parameters) extends XSModul
   val toBpuCfi = ifuRedirectToBpu.bits.cfiUpdate
   toBpuCfi.fromFtqRedirectSram(ftq_redirect_sram.io.rdata.head)
   when (ifuRedirectReg.bits.cfiUpdate.pd.isRet) {
-    toBpuCfi.target := toBpuCfi.rasEntry.retAddr
+    // toBpuCfi.target := toBpuCfi.rasEntry.retAddr
+    toBpuCfi.target := toBpuCfi.topAddr
   }
 
   // *********************************************************************
