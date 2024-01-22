@@ -74,7 +74,7 @@ case class XSCoreParameters
   RasSpecSize: Int = 64,
   RasCtrSize: Int = 8,
   CacheLineSize: Int = 512,
-  FtbWays: Int = 4,
+  FtbWays: Int = 8,
   hasMbist:Boolean = true,
   hasShareBus:Boolean = false,
   bootAddress:Long = 0x10000000L,
