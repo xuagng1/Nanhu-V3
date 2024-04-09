@@ -89,6 +89,7 @@ class FrontendImp (outer: Frontend) extends LazyModuleImp(outer)
   bpu.io.reset_vector := io.reset_vector
 
 // pmp
+//  val prefetchPipeNum = ICacheParameters().prefetchPipeNum
   val pmp = Module(new PMP())
   val pmp_check = VecInit(Seq.fill(4)(Module(new PMPChecker(3, sameCycle = true)).io))
   pmp.io.distribute_csr := csrCtrl.distribute_csr
@@ -134,7 +135,7 @@ class FrontendImp (outer: Frontend) extends LazyModuleImp(outer)
     itlbParams
   )
 
-  icache.io.prefetch <> ftq.io.toPrefetch
+  icache.io.prefetch <> ftq.io.toPrefetch                   //         fdip
 
   val needFlush = RegNext(io.backend.toFtq.redirect.valid)
 
@@ -163,6 +164,8 @@ class FrontendImp (outer: Frontend) extends LazyModuleImp(outer)
 
   icache.io.csr_pf_enable     := RegNext(csrCtrl.l1I_pf_enable)
   icache.io.csr_parity_enable := RegNext(csrCtrl.icache_parity_enable)
+
+  icache.io.backend_redirect := io.backend.toFtq.redirect.valid
 
   //IFU-Ibuffer
   ibuffer.io.in <> ifu.io.toIbuffer

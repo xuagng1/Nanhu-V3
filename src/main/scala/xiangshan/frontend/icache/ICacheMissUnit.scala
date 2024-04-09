@@ -80,7 +80,7 @@ class ICacheMissEntry(edge: TLEdgeOut, id: Int)(implicit p: Parameters) extends 
 
     val victimInfor    =  Output(new ICacheVictimInfor())
 
-    val toPrefetch    = ValidIO(UInt(PAddrBits.W))
+    val ongoing_req    = Output(new FilterInfo)
     val fencei      = Input(Bool())
 
   })
@@ -125,6 +125,8 @@ class ICacheMissEntry(edge: TLEdgeOut, id: Int)(implicit p: Parameters) extends 
   io.meta_write.bits := DontCare
   io.data_write.bits := DontCare
 
+  io.ongoing_req.valid := (state =/= s_idle)
+  io.ongoing_req.paddr :=  addrAlign(req.paddr, blockBytes, PAddrBits)
 
   io.req.ready := (state === s_idle)
   io.mem_acquire.valid := (state_dup(1) === s_send_mem_aquire)
@@ -132,8 +134,8 @@ class ICacheMissEntry(edge: TLEdgeOut, id: Int)(implicit p: Parameters) extends 
 
  // io.toPrefetch.valid := (state_dup(2) =/= s_idle)
  // io.toPrefetch.bits  :=  addrAlign(req.paddr, blockBytes, PAddrBits)
-  io.toPrefetch.valid := DontCare
-  io.toPrefetch.bits := DontCare
+  // io.toPrefetch.valid := DontCare
+  // io.toPrefetch.bits := DontCare
   val grantack = RegEnable(edge.GrantAck(io.mem_grant.bits), io.mem_grant.fire)
   val grant_param = Reg(UInt(TLPermissions.bdWidth.W))
   val is_dirty = RegInit(false.B)
@@ -236,14 +238,17 @@ class ICacheMissUnit(edge: TLEdgeOut)(implicit p: Parameters) extends ICacheMiss
     val mem_acquire = DecoupledIO(new TLBundleA(edge.bundle))
     val mem_grant   = Flipped(DecoupledIO(new TLBundleD(edge.bundle)))
 
+    val fdip_acquire = Flipped(DecoupledIO(new TLBundleA(edge.bundle)))
+    val fdip_grant   = DecoupledIO(new TLBundleD(edge.bundle))
+    
     val meta_write  = DecoupledIO(new ICacheMetaWriteBundle)
     val data_write  = DecoupledIO(new ICacheDataWriteBundle)
 
     val fencei      = Input(Bool())
-
+    val ICacheMissUnitInfo = new ICacheMissUnitInfo
     val victimInfor = Vec(PortNumber, Output(new ICacheVictimInfor()))
 
-     val prefetch_req          =  Flipped(DecoupledIO(new PIQReq))
+  //   val prefetch_req          =  Flipped(DecoupledIO(new PIQReq))
      val prefetch_check        =  Vec(PortNumber,ValidIO(UInt(PAddrBits.W)))
 
 
@@ -278,6 +283,7 @@ class ICacheMissUnit(edge: TLEdgeOut)(implicit p: Parameters) extends ICacheMiss
     }
 
     io.resp(i) <> entry.io.resp
+    io.ICacheMissUnitInfo.mshr(i) <> entry.io.ongoing_req
     entry.io.fencei := io.fencei
 
     io.victimInfor(i) := entry.io.victimInfor
@@ -296,6 +302,11 @@ class ICacheMissUnit(edge: TLEdgeOut)(implicit p: Parameters) extends ICacheMiss
     entry
   }
 
+  io.fdip_grant.valid := false.B
+  io.fdip_grant.bits  := DontCare
+  when (io.mem_grant.bits.source === PortNumber.U) {
+    io.fdip_grant <> io.mem_grant
+  }
   // val alloc = Wire(UInt(log2Ceil(nPrefetchEntries).W))
 
   // val prefEntries = (iprefetchUnitIDStart until iprefetchUnitIDStart + nPrefetchEntries) map { i =>
@@ -320,8 +331,21 @@ class ICacheMissUnit(edge: TLEdgeOut)(implicit p: Parameters) extends ICacheMiss
   // alloc := PriorityEncoder(prefEntries.map(_.io.req.ready))
   // io.prefetch_req.ready := ParallelOR(prefEntries.map(_.io.req.ready))
   // val tl_a_chanel = entries.map(_.io.mem_acquire) ++ prefEntries.map(_.io.mem_hint)
-  io.prefetch_req.ready := DontCare
-  val tl_a_chanel = entries.map(_.io.mem_acquire)
+ // io.prefetch_req.ready := DontCare
+
+   /**
+    ******************************************************************************
+    * Register 2 cycle meta write info for IPrefetchPipe filter
+    ******************************************************************************
+    */
+  val meta_write_buffer = InitQueue(new FilterInfo, size = 2)
+  meta_write_buffer(0).valid := io.meta_write.fire
+  meta_write_buffer(0).paddr := io.data_write.bits.paddr
+  meta_write_buffer(1)       := meta_write_buffer(0)
+  (0 until 2).foreach (i => {
+    io.ICacheMissUnitInfo.recentWrite(i) := meta_write_buffer(i)
+  })
+  val tl_a_chanel = entries.map(_.io.mem_acquire) :+ io.fdip_acquire
   TLArbiter.lowest(edge, io.mem_acquire, tl_a_chanel:_*)
 
 

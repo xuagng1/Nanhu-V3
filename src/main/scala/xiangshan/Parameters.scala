@@ -163,6 +163,8 @@ case class XSCoreParameters
   EnableAccurateLoadError: Boolean = true,
   MMUAsidLen: Int = 16, // max is 16, 0 is not supported now
   UseOneDtlb: Boolean = false,
+  itlbPortNum: Int = 2 + ICacheParameters().prefetchPipeNum + 1,
+  ipmpPortNum: Int = 2 + ICacheParameters().prefetchPipeNum + 1,
   itlbParameters: TLBParameters = TLBParameters(
     name = "itlb",
     fetchi = true,

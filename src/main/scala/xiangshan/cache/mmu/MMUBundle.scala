@@ -383,14 +383,27 @@ class TlbReplaceIO(Width: Int, q: TLBParameters)(implicit p: Parameters) extends
   }
 
 }
-
+// class MemBlockidxBundle(implicit p: Parameters) extends TlbBundle {
+//   val is_ld = Bool()
+//   val is_st = Bool()
+//   val idx =
+//     if (VirtualLoadQueueSize >= StoreQueueSize) {
+//       val idx = UInt(log2Ceil(VirtualLoadQueueSize).W)
+//       idx
+//     } else {
+//       val idx = UInt(log2Ceil(StoreQueueSize).W)
+//       idx
+//     }
+// }
 class TlbReq(implicit p: Parameters) extends TlbBundle {
   val vaddr = Output(UInt(VAddrBits.W))
   val cmd = Output(TlbCmd())
   val size = Output(UInt(log2Ceil(log2Ceil(XLEN/8)+1).W))
+
   val robIdx = Output(new RobPtr)
   val debug = new Bundle {
     val pc = Output(UInt(XLEN.W))
+    // val robIdx = Output(new RobPtr)
     val isFirstIssue = Output(Bool())
   }
 

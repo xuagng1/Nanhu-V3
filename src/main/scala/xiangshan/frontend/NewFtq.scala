@@ -1153,55 +1153,75 @@ class Ftq(parentName:String = "Unknown")(implicit p: Parameters) extends XSModul
   // *********************** to prefetch ****************************
   // ****************************************************************
 
-  ftq_pc_mem.io.other_raddrs(0) := DontCare
-  if(cacheParams.hasPrefetch){
-    val prefetchPtr = RegInit(FtqPtr(false.B, 0.U))
-    val diff_prefetch_addr = WireInit(update_target(prefetchPtr.value)) //TODO: remove this
+  val prefetchPtr = RegInit(FtqPtr(false.B, 0.U))
+  val nextPrefetchPtr = WireInit(prefetchPtr)
 
-    prefetchPtr := prefetchPtr + io.toPrefetch.req.fire
-
-    ftq_pc_mem.io.other_raddrs(0) := prefetchPtr.value
-
-    when (bpu_s2_redirect && !isBefore(prefetchPtr, bpu_s2_resp.ftq_idx)) {
-      prefetchPtr := bpu_s2_resp.ftq_idx
+  prefetchPtr := nextPrefetchPtr
+  when(io.toPrefetch.req.fire) {
+    when(prefetchPtr < bpuPtr - 2.U) {
+      nextPrefetchPtr := prefetchPtr + 1.U
     }
-
-    when (bpu_s3_redirect && !isBefore(prefetchPtr, bpu_s3_resp.ftq_idx)) {
-      prefetchPtr := bpu_s3_resp.ftq_idx
-      // XSError(true.B, "\ns3_redirect mechanism not implemented!\n")
-    }
-
-
-    val prefetch_is_to_send = WireInit(entry_fetch_status(prefetchPtr.value) === f_to_send)
-    val prefetch_addr = Wire(UInt(VAddrBits.W))
-
-    when (last_cycle_bpu_in && bpu_in_bypass_ptr === prefetchPtr) {
-      prefetch_is_to_send := true.B
-      prefetch_addr := last_cycle_bpu_target
-      diff_prefetch_addr := last_cycle_bpu_target // TODO: remove this
-    }.otherwise{
-      prefetch_addr := RegNext( ftq_pc_mem.io.other_rdatas(0).startAddr)
-    }
-    io.toPrefetch.req.valid := prefetchPtr =/= bpuPtr && prefetch_is_to_send
-    io.toPrefetch.req.bits.target := prefetch_addr
-
-    when(redirectVec.map(r => r.valid).reduce(_||_)){
+  }
+  when(prefetchPtr < ifuPtr + minRangeFromIFUptr.U) {
+    nextPrefetchPtr := ifuPtr + minRangeFromIFUptr.U
+  }.elsewhen(prefetchPtr > ifuPtr + maxRangeFromIFUptr.U) {
+    nextPrefetchPtr := ifuPtr + maxRangeFromIFUptr.U
+  }
+  when(redirectVec.map(r => r.valid).reduce(_||_)){
       val r = PriorityMux(redirectVec.map(r => (r.valid -> r.bits)))
-      val next = r.ftqIdx + 1.U
-      prefetchPtr := next
-    }
+      val next = r.ftqIdx + minRangeFromIFUptr.U
+      nextPrefetchPtr := next
+  }
+    // data from ftq_pc_mem has 1 cycle delay
+  io.toPrefetch.req.valid := RegNext(entry_fetch_status(nextPrefetchPtr.value) === f_to_send)
+  ftq_pc_mem.io.other_raddrs(0) := nextPrefetchPtr.value
+  io.toPrefetch.req.bits.target := RegNext(ftq_pc_mem.io.other_rdatas(0).startAddr)
+
+  // ftq_pc_mem.io.other_raddrs(0) := DontCare
+  // if(cacheParams.hasPrefetch){
+  //   val prefetchPtr = RegInit(FtqPtr(false.B, 0.U))
+  //   val diff_prefetch_addr = WireInit(update_target(prefetchPtr.value)) //TODO: remove this
+
+  //   prefetchPtr := prefetchPtr + io.toPrefetch.req.fire
+
+  //   ftq_pc_mem.io.other_raddrs(0) := prefetchPtr.value
+
+  //   when (bpu_s2_redirect && !isBefore(prefetchPtr, bpu_s2_resp.ftq_idx)) {
+  //     prefetchPtr := bpu_s2_resp.ftq_idx
+  //   }
+
+  //   when (bpu_s3_redirect && !isBefore(prefetchPtr, bpu_s3_resp.ftq_idx)) {
+  //     prefetchPtr := bpu_s3_resp.ftq_idx
+  //     // XSError(true.B, "\ns3_redirect mechanism not implemented!\n")
+  //   }
+
+
+  //   val prefetch_is_to_send = WireInit(entry_fetch_status(prefetchPtr.value) === f_to_send)
+  //   val prefetch_addr = Wire(UInt(VAddrBits.W))
+
+  //   when (last_cycle_bpu_in && bpu_in_bypass_ptr === prefetchPtr) {
+  //     prefetch_is_to_send := true.B
+  //     prefetch_addr := last_cycle_bpu_target
+  //     diff_prefetch_addr := last_cycle_bpu_target // TODO: remove this
+  //   }.otherwise{
+  //     prefetch_addr := RegNext( ftq_pc_mem.io.other_rdatas(0).startAddr)
+  //   }
+  //   io.toPrefetch.req.valid := prefetchPtr =/= bpuPtr && prefetch_is_to_send
+  //   io.toPrefetch.req.bits.target := prefetch_addr
+
+
 
     // TODO: remove this
     // XSError(io.toPrefetch.req.valid && diff_prefetch_addr =/= prefetch_addr,
     //         f"\nprefetch_req_target wrong! prefetchPtr: ${prefetchPtr}, prefetch_addr: ${Hexadecimal(prefetch_addr)} diff_prefetch_addr: ${Hexadecimal(diff_prefetch_addr)}\n")
 
 
-    XSError(isBefore(bpuPtr, prefetchPtr) && !isFull(bpuPtr, prefetchPtr), "\nprefetchPtr is before bpuPtr!\n")
-    XSError(isBefore(prefetchPtr, ifuPtr) && !isFull(ifuPtr, prefetchPtr), "\nifuPtr is before prefetchPtr!\n")
-  }
-  else {
-    io.toPrefetch.req <> DontCare
-  }
+  //   XSError(isBefore(bpuPtr, prefetchPtr) && !isFull(bpuPtr, prefetchPtr), "\nprefetchPtr is before bpuPtr!\n")
+  //   XSError(isBefore(prefetchPtr, ifuPtr) && !isFull(ifuPtr, prefetchPtr), "\nifuPtr is before prefetchPtr!\n")
+  // }
+  // else {
+  //   io.toPrefetch.req <> DontCare
+  // }
 
   // ******************************************************************************
   // **************************** commit perf counters ****************************
