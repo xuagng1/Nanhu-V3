@@ -94,10 +94,10 @@ case class XSCoreParameters
         ( 4096,  119,    8)),
   ITTageTableInfos: Seq[Tuple3[Int,Int,Int]] =
   //      Sets  Hist   Tag
-    Seq(( 256,    4,    9),
+    Seq(//( 256,    4,    9),
         ( 256,    8,    9),
-        ( 512,   13,    9),
-        ( 512,   16,    9),
+        //( 512,   13,    9),
+        //( 512,   16,    9),
         ( 512,   32,    9)),
   SCNRows: Int = 512,
   SCNTables: Int = 4,
@@ -128,11 +128,11 @@ case class XSCoreParameters
 
       (preds, ras.io.out)
     }),
-  IBufSize: Int = 48,
+  IBufSize: Int = 32,
   DecodeWidth: Int = 4,
   RenameWidth: Int = 4,
   CommitWidth: Int = 6,
-  FtqSize: Int = 64,
+  FtqSize: Int = 48,
   EnableLoadFastWakeUp: Boolean = true, // NOTE: not supported now, make it false
   NRPhyRegs: Int = 128,
   LoadQueueSize: Int = 80,
